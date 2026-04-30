@@ -1,0 +1,649 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ResumeIQ — Intelligent Resume Parser</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=JetBrains+Mono:wght@300;400;500&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #0a0a0f;
+    --surface: #111118;
+    --surface2: #1a1a25;
+    --border: #2a2a3a;
+    --accent: #7c6aff;
+    --accent2: #ff6ab0;
+    --accent3: #6affd4;
+    --text: #e8e8f0;
+    --muted: #6b6b85;
+    --success: #4ade80;
+    --danger: #ff6b6b;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: 'JetBrains Mono', monospace;
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  /* Ambient background */
+  body::before {
+    content: '';
+    position: fixed;
+    top: -200px; left: -200px;
+    width: 600px; height: 600px;
+    background: radial-gradient(circle, rgba(124,106,255,0.08) 0%, transparent 70%);
+    pointer-events: none;
+    z-index: 0;
+  }
+  body::after {
+    content: '';
+    position: fixed;
+    bottom: -200px; right: -200px;
+    width: 500px; height: 500px;
+    background: radial-gradient(circle, rgba(255,106,176,0.06) 0%, transparent 70%);
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  /* Header */
+  header {
+    position: relative;
+    z-index: 10;
+    padding: 24px 48px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    border-bottom: 1px solid var(--border);
+    backdrop-filter: blur(20px);
+  }
+  .logo {
+    font-family: 'Syne', sans-serif;
+    font-size: 22px;
+    font-weight: 800;
+    letter-spacing: -0.5px;
+  }
+  .logo span { color: var(--accent); }
+  .logo .dot { color: var(--accent2); }
+  .status-pill {
+    font-size: 11px;
+    padding: 4px 12px;
+    border-radius: 20px;
+    border: 1px solid var(--accent);
+    color: var(--accent);
+    letter-spacing: 1px;
+    text-transform: uppercase;
+  }
+
+  /* Layout */
+  .main {
+    position: relative;
+    z-index: 1;
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 48px 32px;
+  }
+
+  .hero {
+    text-align: center;
+    margin-bottom: 56px;
+  }
+  .hero h1 {
+    font-family: 'Syne', sans-serif;
+    font-size: clamp(36px, 5vw, 64px);
+    font-weight: 800;
+    line-height: 1.05;
+    letter-spacing: -2px;
+    margin-bottom: 16px;
+  }
+  .hero h1 .gradient {
+    background: linear-gradient(135deg, var(--accent), var(--accent2));
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+  .hero p {
+    color: var(--muted);
+    font-size: 14px;
+    letter-spacing: 0.3px;
+    line-height: 1.7;
+  }
+
+  /* Upload Zone */
+  .upload-zone {
+    border: 2px dashed var(--border);
+    border-radius: 16px;
+    padding: 56px 32px;
+    text-align: center;
+    background: var(--surface);
+    cursor: pointer;
+    transition: all 0.3s ease;
+    position: relative;
+    overflow: hidden;
+    margin-bottom: 32px;
+  }
+  .upload-zone::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(135deg, rgba(124,106,255,0.03), rgba(255,106,176,0.03));
+    opacity: 0;
+    transition: opacity 0.3s;
+  }
+  .upload-zone:hover, .upload-zone.dragging {
+    border-color: var(--accent);
+    transform: translateY(-2px);
+    box-shadow: 0 20px 60px rgba(124,106,255,0.15);
+  }
+  .upload-zone:hover::before, .upload-zone.dragging::before { opacity: 1; }
+  .upload-icon {
+    font-size: 48px;
+    margin-bottom: 16px;
+    display: block;
+    filter: grayscale(0.3);
+  }
+  .upload-zone h3 {
+    font-family: 'Syne', sans-serif;
+    font-size: 20px;
+    font-weight: 700;
+    margin-bottom: 8px;
+  }
+  .upload-zone p {
+    color: var(--muted);
+    font-size: 13px;
+    margin-bottom: 24px;
+  }
+  #fileInput { display: none; }
+  .btn-upload {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 12px 28px;
+    background: linear-gradient(135deg, var(--accent), #5a4fd4);
+    color: white;
+    border: none;
+    border-radius: 8px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 13px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s;
+    letter-spacing: 0.5px;
+  }
+  .btn-upload:hover { transform: translateY(-1px); box-shadow: 0 8px 24px rgba(124,106,255,0.4); }
+
+  /* Loading bar */
+  .progress-bar {
+    display: none;
+    height: 3px;
+    background: var(--border);
+    border-radius: 3px;
+    overflow: hidden;
+    margin-top: 20px;
+  }
+  .progress-bar.active { display: block; }
+  .progress-fill {
+    height: 100%;
+    background: linear-gradient(90deg, var(--accent), var(--accent2));
+    border-radius: 3px;
+    animation: progress 1.5s ease-in-out infinite;
+  }
+  @keyframes progress {
+    0% { width: 0%; margin-left: 0; }
+    50% { width: 70%; margin-left: 15%; }
+    100% { width: 0%; margin-left: 100%; }
+  }
+
+  /* Result Card */
+  .result-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    padding: 32px;
+    margin-bottom: 32px;
+    display: none;
+    animation: slideUp 0.4s ease;
+  }
+  .result-card.visible { display: block; }
+  @keyframes slideUp {
+    from { opacity: 0; transform: translateY(20px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  .result-header {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    margin-bottom: 32px;
+    gap: 16px;
+  }
+  .candidate-name {
+    font-family: 'Syne', sans-serif;
+    font-size: 28px;
+    font-weight: 800;
+    letter-spacing: -0.5px;
+  }
+  .parse-badge {
+    background: rgba(74,222,128,0.1);
+    border: 1px solid rgba(74,222,128,0.3);
+    color: var(--success);
+    padding: 6px 14px;
+    border-radius: 6px;
+    font-size: 11px;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    white-space: nowrap;
+  }
+
+  .info-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 16px;
+    margin-bottom: 28px;
+  }
+  .info-item {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 14px 18px;
+  }
+  .info-label {
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 1.5px;
+    color: var(--muted);
+    margin-bottom: 6px;
+  }
+  .info-value {
+    font-size: 13px;
+    color: var(--text);
+    word-break: break-all;
+  }
+  .info-value.accent { color: var(--accent); }
+
+  .section-title {
+    font-family: 'Syne', sans-serif;
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 2px;
+    color: var(--muted);
+    margin-bottom: 14px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .section-title::after {
+    content: '';
+    flex: 1;
+    height: 1px;
+    background: var(--border);
+  }
+
+  .skills-container {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-bottom: 28px;
+  }
+  .skill-tag {
+    padding: 5px 13px;
+    border-radius: 6px;
+    font-size: 12px;
+    font-weight: 500;
+    border: 1px solid;
+  }
+  .skill-tag.lang { border-color: rgba(124,106,255,0.4); color: var(--accent); background: rgba(124,106,255,0.08); }
+  .skill-tag.framework { border-color: rgba(255,106,176,0.4); color: var(--accent2); background: rgba(255,106,176,0.08); }
+  .skill-tag.db { border-color: rgba(106,255,212,0.4); color: var(--accent3); background: rgba(106,255,212,0.08); }
+  .skill-tag.other { border-color: var(--border); color: var(--muted); background: var(--surface2); }
+
+  /* Database Section */
+  .db-section {
+    margin-top: 48px;
+  }
+  .db-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 24px;
+    gap: 16px;
+    flex-wrap: wrap;
+  }
+  .db-title {
+    font-family: 'Syne', sans-serif;
+    font-size: 22px;
+    font-weight: 800;
+  }
+
+  .search-bar {
+    display: flex;
+    gap: 12px;
+    flex: 1;
+    max-width: 400px;
+  }
+  .search-input {
+    flex: 1;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    color: var(--text);
+    padding: 10px 16px;
+    border-radius: 8px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 13px;
+    outline: none;
+    transition: border-color 0.2s;
+  }
+  .search-input:focus { border-color: var(--accent); }
+  .search-input::placeholder { color: var(--muted); }
+  .btn-search {
+    padding: 10px 20px;
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    color: var(--text);
+    border-radius: 8px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 13px;
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+  .btn-search:hover { border-color: var(--accent); color: var(--accent); }
+
+  .resume-table {
+    width: 100%;
+    border-collapse: collapse;
+  }
+  .resume-table th {
+    text-align: left;
+    padding: 12px 16px;
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 1.5px;
+    color: var(--muted);
+    border-bottom: 1px solid var(--border);
+  }
+  .resume-table td {
+    padding: 14px 16px;
+    font-size: 13px;
+    border-bottom: 1px solid rgba(255,255,255,0.04);
+    vertical-align: middle;
+  }
+  .resume-table tr:hover td { background: rgba(124,106,255,0.04); }
+  .skill-count {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 28px; height: 28px;
+    background: rgba(124,106,255,0.15);
+    border-radius: 6px;
+    color: var(--accent);
+    font-size: 12px;
+    font-weight: 600;
+  }
+  .btn-delete {
+    background: none;
+    border: 1px solid rgba(255,107,107,0.3);
+    color: var(--danger);
+    padding: 5px 12px;
+    border-radius: 6px;
+    font-size: 11px;
+    cursor: pointer;
+    transition: all 0.2s;
+    font-family: 'JetBrains Mono', monospace;
+  }
+  .btn-delete:hover { background: rgba(255,107,107,0.1); }
+
+  .empty-state {
+    text-align: center;
+    padding: 64px 32px;
+    color: var(--muted);
+  }
+  .empty-state p { font-size: 13px; margin-top: 8px; }
+
+  .toast {
+    position: fixed;
+    bottom: 32px;
+    right: 32px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 14px 20px;
+    font-size: 13px;
+    z-index: 1000;
+    transform: translateY(80px);
+    opacity: 0;
+    transition: all 0.3s ease;
+  }
+  .toast.show { transform: translateY(0); opacity: 1; }
+  .toast.success { border-color: rgba(74,222,128,0.4); color: var(--success); }
+  .toast.error { border-color: rgba(255,107,107,0.4); color: var(--danger); }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="logo">Resume<span>IQ</span><span class="dot">.</span></div>
+  <div class="status-pill">● System Online</div>
+</header>
+
+<div class="main">
+  <div class="hero">
+    <h1>Parse Resumes<br><span class="gradient">Intelligently.</span></h1>
+    <p>Upload PDF or DOCX resumes — extract name, contact, skills & education instantly.<br>All data stored in a searchable local database.</p>
+  </div>
+
+  <!-- Upload Zone -->
+  <div class="upload-zone" id="uploadZone">
+    <span class="upload-icon">📄</span>
+    <h3>Drop your resume here</h3>
+    <p>Supports PDF and DOCX formats · Max 10MB</p>
+    <button class="btn-upload" onclick="document.getElementById('fileInput').click()">
+      ⬆ Choose File
+    </button>
+    <input type="file" id="fileInput" accept=".pdf,.docx">
+    <div class="progress-bar" id="progressBar">
+      <div class="progress-fill"></div>
+    </div>
+  </div>
+
+  <!-- Result Card -->
+  <div class="result-card" id="resultCard">
+    <div class="result-header">
+      <div>
+        <div class="candidate-name" id="rName">—</div>
+        <div style="color:var(--muted);font-size:12px;margin-top:4px" id="rFile">—</div>
+      </div>
+      <div class="parse-badge">✓ Parsed</div>
+    </div>
+
+    <div class="info-grid">
+      <div class="info-item">
+        <div class="info-label">Email</div>
+        <div class="info-value" id="rEmail">—</div>
+      </div>
+      <div class="info-item">
+        <div class="info-label">Phone</div>
+        <div class="info-value" id="rPhone">—</div>
+      </div>
+      <div class="info-item">
+        <div class="info-label">Experience</div>
+        <div class="info-value accent" id="rExp">—</div>
+      </div>
+      <div class="info-item">
+        <div class="info-label">LinkedIn</div>
+        <div class="info-value" id="rLinkedin">—</div>
+      </div>
+      <div class="info-item">
+        <div class="info-label">GitHub</div>
+        <div class="info-value" id="rGithub">—</div>
+      </div>
+      <div class="info-item">
+        <div class="info-label">Education</div>
+        <div class="info-value" id="rEdu">—</div>
+      </div>
+    </div>
+
+    <div class="section-title">Detected Skills</div>
+    <div class="skills-container" id="rSkills"></div>
+  </div>
+
+  <!-- Database -->
+  <div class="db-section">
+    <div class="db-header">
+      <div class="db-title">Candidate Database</div>
+      <div class="search-bar">
+        <input class="search-input" id="searchInput" placeholder="Search by name, skill..." onkeydown="if(event.key==='Enter')searchResumes()">
+        <button class="btn-search" onclick="searchResumes()">Search</button>
+        <button class="btn-search" onclick="loadResumes()">All</button>
+      </div>
+    </div>
+    <div id="tableContainer">
+      <div class="empty-state">⏳<p>Loading candidates...</p></div>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+const LANGS = ['Python','Java','JavaScript','TypeScript','C++','C#','C','Go','Rust','Ruby','Swift','Kotlin','PHP','R','MATLAB','Scala','Perl','Shell'];
+const FRAMEWORKS = ['React','Vue','Angular','Node.js','Express','Django','Flask','FastAPI','Spring Boot','Next.js','Svelte','TensorFlow','PyTorch','Keras'];
+const DBS = ['MySQL','PostgreSQL','MongoDB','SQLite','Redis','Elasticsearch','Oracle','Firebase','DynamoDB'];
+
+function getSkillClass(skill) {
+  if (LANGS.includes(skill)) return 'lang';
+  if (FRAMEWORKS.includes(skill)) return 'framework';
+  if (DBS.includes(skill)) return 'db';
+  return 'other';
+}
+
+function showToast(msg, type='success') {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.className = `toast ${type} show`;
+  setTimeout(() => t.className = 'toast', 3000);
+}
+
+// Drag and drop
+const zone = document.getElementById('uploadZone');
+zone.addEventListener('dragover', e => { e.preventDefault(); zone.classList.add('dragging'); });
+zone.addEventListener('dragleave', () => zone.classList.remove('dragging'));
+zone.addEventListener('drop', e => {
+  e.preventDefault();
+  zone.classList.remove('dragging');
+  const file = e.dataTransfer.files[0];
+  if (file) uploadFile(file);
+});
+document.getElementById('fileInput').addEventListener('change', e => {
+  if (e.target.files[0]) uploadFile(e.target.files[0]);
+});
+
+async function uploadFile(file) {
+  const bar = document.getElementById('progressBar');
+  bar.classList.add('active');
+  const formData = new FormData();
+  formData.append('file', file);
+  try {
+    const res = await fetch('/upload', { method: 'POST', body: formData });
+    const data = await res.json();
+    bar.classList.remove('active');
+    if (data.success) {
+      showResult(data.data, file.name);
+      loadResumes();
+      showToast('✓ Resume parsed successfully');
+    } else {
+      showToast('✗ ' + data.error, 'error');
+    }
+  } catch(e) {
+    bar.classList.remove('active');
+    showToast('✗ Upload failed', 'error');
+  }
+}
+
+function showResult(d, filename) {
+  document.getElementById('rName').textContent = d.name;
+  document.getElementById('rFile').textContent = filename;
+  document.getElementById('rEmail').textContent = d.email;
+  document.getElementById('rPhone').textContent = d.phone;
+  document.getElementById('rExp').textContent = d.experience;
+  document.getElementById('rLinkedin').textContent = d.linkedin;
+  document.getElementById('rGithub').textContent = d.github;
+  document.getElementById('rEdu').textContent = d.education.join(', ');
+
+  const sc = document.getElementById('rSkills');
+  sc.innerHTML = '';
+  (d.skills || []).forEach(s => {
+    const tag = document.createElement('span');
+    tag.className = `skill-tag ${getSkillClass(s)}`;
+    tag.textContent = s;
+    sc.appendChild(tag);
+  });
+
+  document.getElementById('resultCard').classList.add('visible');
+}
+
+async function loadResumes() {
+  const res = await fetch('/resumes');
+  const data = await res.json();
+  renderTable(data);
+}
+
+async function searchResumes() {
+  const q = document.getElementById('searchInput').value.trim();
+  const res = await fetch(`/resumes?search=${encodeURIComponent(q)}`);
+  const data = await res.json();
+  renderTable(data);
+}
+
+function renderTable(data) {
+  const container = document.getElementById('tableContainer');
+  if (!data.length) {
+    container.innerHTML = '<div class="empty-state">📭<p>No candidates found.</p></div>';
+    return;
+  }
+  container.innerHTML = `
+    <table class="resume-table">
+      <thead>
+        <tr>
+          <th>#</th>
+          <th>Candidate</th>
+          <th>Email</th>
+          <th>Experience</th>
+          <th>Skills</th>
+          <th>Education</th>
+          <th>Uploaded</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody>
+        ${data.map((r,i) => `
+          <tr>
+            <td style="color:var(--muted)">${String(i+1).padStart(2,'0')}</td>
+            <td><strong style="font-family:'Syne',sans-serif;font-weight:700">${r.name}</strong></td>
+            <td style="color:var(--muted)">${r.email}</td>
+            <td style="color:var(--accent)">${r.experience}</td>
+            <td><span class="skill-count">${r.skills.length}</span></td>
+            <td style="color:var(--muted);font-size:12px">${r.education[0] || '—'}</td>
+            <td style="color:var(--muted);font-size:11px">${r.uploaded_at?.split(' ')[0] || '—'}</td>
+            <td><button class="btn-delete" onclick="deleteResume(${r.id}, this)">Delete</button></td>
+          </tr>
+        `).join('')}
+      </tbody>
+    </table>
+  `;
+}
+
+async function deleteResume(id, btn) {
+  await fetch(`/resumes/${id}`, { method: 'DELETE' });
+  btn.closest('tr').style.opacity = '0';
+  btn.closest('tr').style.transition = 'opacity 0.3s';
+  setTimeout(loadResumes, 300);
+  showToast('Candidate removed');
+}
+
+loadResumes();
+</script>
+</body>
+</html>
